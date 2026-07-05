@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>生活紀錄本</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F6F8;
+    --surface:#FFFFFF;
+    --border:#E3E7EC;
+    --ink:#1B2430;
+    --ink-soft:#5B6472;
+    --ink-faint:#95A0AC;
+    --accent:#146B63;
+    --accent-dark:#0E4B45;
+    --accent-soft:#E3F0EE;
+    --amber:#C98A2C;
+    --amber-soft:#FBF1E0;
+    --pos:#2E7D5B;
+    --pos-soft:#E5F3EC;
+    --neg:#C1493D;
+    --neg-soft:#FBEAE7;
+    --radius:14px;
+    --sans:'Noto Sans TC',sans-serif;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--sans);background:var(--bg);color:var(--ink);}
+  .app{display:flex;min-height:100vh;}
+
+  /* Sidebar */
+  .sidebar{
+    width:232px;flex-shrink:0;background:var(--accent-dark);color:#EAF3F1;
+    padding:28px 18px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;margin-bottom:26px;padding:0 10px;}
+  .brand-title{font-weight:900;font-size:19px;letter-spacing:.5px;}
+  .brand-sub{font-size:12px;color:#9FC4BE;font-family:var(--mono);}
+  .nav-btn{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:none;
+    background:transparent;color:#CFE4E0;font-family:var(--sans);font-size:14.5px;font-weight:500;
+    cursor:pointer;text-align:left;transition:background .15s ease,color .15s ease;
+  }
+  .nav-btn svg{width:18px;height:18px;flex-shrink:0;opacity:.85;}
+  .nav-btn:hover{background:rgba(255,255,255,.08);}
+  .nav-btn.active{background:#EAF3F1;color:var(--accent-dark);font-weight:700;}
+  .nav-btn.active svg{opacity:1;}
+  .sidebar-footer{margin-top:auto;padding:12px 10px 0;font-size:11.5px;color:#7FA69F;line-height:1.6;}
+
+  /* Main */
+  .main{flex:1;padding:32px 40px 60px;max-width:1080px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fadein .25s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .page-head{margin-bottom:24px;}
+  .page-head h1{font-size:24px;font-weight:900;margin:0 0 4px;}
+  .page-head p{margin:0;color:var(--ink-soft);font-size:13.5px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:20px;}
+  .card h2{font-size:15px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .grid-2{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media (max-width:860px){.grid-2,.grid-3{grid-template-columns:1fr;}}
+
+  /* Today view */
+  .mood-row{display:flex;gap:10px;margin-bottom:16px;}
+  .mood-btn{
+    flex:1;padding:12px 0;border-radius:10px;border:1.5px solid var(--border);background:#FBFBFC;
+    font-size:22px;cursor:pointer;transition:all .15s ease;display:flex;flex-direction:column;align-items:center;gap:4px;
+  }
+  .mood-btn span.label{font-size:11px;color:var(--ink-faint);font-weight:500;}
+  .mood-btn:hover{border-color:var(--ink-faint);}
+  .mood-btn.selected{border-color:var(--sel-color,var(--accent));background:var(--sel-bg,var(--accent-soft));box-shadow:0 0 0 1px var(--sel-color,var(--accent)) inset;}
+  textarea.journal-input{
+    width:100%;min-height:160px;border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;
+    font-family:var(--sans);font-size:14.5px;line-height:1.7;color:var(--ink);resize:vertical;background:#FBFBFC;
+  }
+  textarea.journal-input:focus{outline:none;border-color:var(--accent);}
+  .save-hint{font-size:12px;color:var(--ink-faint);margin-top:8px;}
+
+  .todo-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .todo-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:#FBFBFC;}
+  .todo-item input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+  .todo-item .txt{flex:1;font-size:14px;}
+  .todo-item.done .txt{color:var(--ink-faint);text-decoration:line-through;}
+  .todo-item .due{font-size:11px;color:var(--amber);font-family:var(--mono);flex-shrink:0;}
+  .todo-item .del{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:2px 6px;flex-shrink:0;}
+  .todo-item .del:hover{color:var(--neg);}
+  .add-row{display:flex;gap:8px;margin-top:12px;}
+  .add-row input[type=text],.add-row input[type=date]{
+    border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--sans);font-size:14px;background:#FBFBFC;
+  }
+  .add-row input[type=text]{flex:1;}
+  .btn{
+    border:none;border-radius:8px;padding:9px 16px;font-family:var(--sans);font-size:14px;font-weight:700;
+    cursor:pointer;background:var(--accent);color:#fff;transition:background .15s ease;white-space:nowrap;
+  }
+  .btn:hover{background:var(--accent-dark);}
+  .btn.ghost{background:transparent;color:var(--accent);border:1.5px solid var(--accent);}
+  .btn.ghost:hover{background:var(--accent-soft);}
+  .empty{color:var(--ink-faint);font-size:13.5px;padding:18px 4px;text-align:center;}
+
+  /* History */
+  .filter-row{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  select{border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-family:var(--sans);font-size:14px;background:#FBFBFC;}
+  .hist-item{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+  .hist-head{display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;background:#FBFBFC;}
+  .hist-head:hover{background:var(--accent-soft);}
+  .hist-mood{font-size:20px;}
+  .hist-date{font-family:var(--mono);font-weight:700;font-size:13.5px;width:110px;flex-shrink:0;}
+  .hist-snippet{flex:1;color:var(--ink-soft);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hist-tags{display:flex;gap:6px;flex-shrink:0;}
+  .tag{font-size:11px;padding:2px 8px;border-radius:99px;font-family:var(--mono);}
+  .tag.spend{background:var(--neg-soft);color:var(--neg);}
+  .tag.income{background:var(--pos-soft);color:var(--pos);}
+  .hist-body{padding:16px;border-top:1px solid var(--border);display:none;}
+  .hist-body.open{display:block;}
+  .hist-body textarea{width:100%;min-height:110px;border:1.5px solid var(--border);border-radius:9px;padding:12px;font-family:var(--sans);font-size:14px;margin-bottom:10px;}
+  .hist-actions{display:flex;gap:8px;}
+  .btn.danger{background:transparent;color:var(--neg);border:1.5px solid var(--neg-soft);}
+  .btn.danger:hover{background:var(--neg-soft);}
+
+  /* Expenses */
+  .type-toggle{display:flex;gap:6px;background:#EFF1F4;padding:4px;border-radius:9px;width:fit-content;margin-bottom:12px;}
+  .type-toggle button{border:none;background:transparent;padding:8px 18px;border-radius:7px;font-family:var(--sans);font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink-soft);}
+  .type-toggle button.active[data-type=expense]{background:var(--neg);color:#fff;}
+  .type-toggle button.active[data-type=income]{background:var(--pos);color:#fff;}
+  .exp-form{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;}
+  .exp-form label{font-size:11.5px;color:var(--ink-faint);display:block;margin-bottom:4px;}
+  .exp-form input,.exp-form select{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 10px;font-family:var(--sans);font-size:14px;background:#FBFBFC;}
+  @media (max-width:860px){.exp-form{grid-template-columns:1fr 1fr;}}
+
+  .summary-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+  .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .sum-card .label{font-size:12px;color:var(--ink-faint);margin-bottom:6px;}
+  .sum-card .value{font-family:var(--mono);font-size:22px;font-weight:700;}
+  .sum-card.income .value{color:var(--pos);}
+  .sum-card.expense .value{color:var(--neg);}
+  .sum-card.balance .value{color:var(--accent);}
+
+  table.exp-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.exp-table th{text-align:left;color:var(--ink-faint);font-weight:600;font-size:11.5px;padding:8px 10px;border-bottom:1px solid var(--border);}
+  table.exp-table td{padding:9px 10px;border-bottom:1px solid var(--border);}
+  table.exp-table td.amt{font-family:var(--mono);text-align:right;font-weight:700;}
+  table.exp-table td.amt.expense{color:var(--neg);}
+  table.exp-table td.amt.income{color:var(--pos);}
+  table.exp-table .cat-chip{font-size:11px;background:#EFF1F4;padding:2px 9px;border-radius:99px;color:var(--ink-soft);}
+  table.exp-table .del-row{background:none;border:none;color:var(--ink-faint);cursor:pointer;font-size:15px;}
+  table.exp-table .del-row:hover{color:var(--neg);}
+
+  /* Dashboard */
+  .pulse-wrap{overflow-x:auto;padding-bottom:6px;}
+  .pulse-strip{display:flex;align-items:flex-end;gap:3px;height:90px;min-width:600px;}
+  .pulse-day{flex:1;min-width:8px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;position:relative;}
+  .pulse-bar{width:100%;border-radius:3px 3px 0 0;background:#E3E7EC;min-height:3px;}
+  .pulse-day .dnum{font-size:9px;color:var(--ink-faint);margin-top:4px;font-family:var(--mono);}
+  .pulse-legend{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;}
+  .pulse-legend .lg-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);}
+  .lg-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .chart-box{position:relative;height:230px;}
+  .budget-settings{margin-top:14px;}
+  .budget-settings.hidden{display:none;}
+  .bs-row{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;margin-bottom:8px;}
+  .bs-row label{font-size:13.5px;}
+  .bs-row input{border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-family:var(--mono);font-size:13px;text-align:right;}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:12.5px;font-weight:600;cursor:pointer;padding:0;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-title">生活紀錄本</div>
+      <div class="brand-sub" id="sidebarDate">--</div>
+    </div>
+    <button class="nav-btn active" data-view="today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+      今日
+    </button>
+    <button class="nav-btn" data-view="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      日記歷史
+    </button>
+    <button class="nav-btn" data-view="todos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      待辦事項
+    </button>
+    <button class="nav-btn" data-view="expenses">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>
+      記帳
+    </button>
+    <button class="nav-btn" data-view="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
+      儀表板
+    </button>
+    <div class="sidebar-footer">資料僅儲存於你個人的帳號中,不會與他人共用。</div>
+  </aside>
+
+  <main class="main">
+
+    <!-- TODAY -->
+    <section class="view active" id="view-today">
+      <div class="page-head"><h1 id="todayTitle">今天過得如何?</h1><p>記錄下今天的心情與生活點滴</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>今日心情</h2>
+          <div class="mood-row" id="moodRow"></div>
+          <h2 style="margin-top:18px;">今日日記</h2>
+          <textarea class="journal-input" id="journalInput" placeholder="寫下今天發生的事、感受到的心情……"></textarea>
+          <div class="save-hint" id="saveHint">內容會自動儲存</div>
+        </div>
+        <div class="card">
+          <h2>今日待辦</h2>
+          <ul class="todo-list" id="dailyTodoList"></ul>
+          <div class="add-row">
+            <input type="text" id="dailyTodoInput" placeholder="新增今日待辦事項">
+            <button class="btn" id="addDailyTodo">新增</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" id="view-history">
+      <div class="page-head"><h1>日記歷史</h1><p>回顧過去寫下的每一篇日記</p></div>
+      <div class="card">
+        <div class="filter-row">
+          <select id="historyMonthFilter"></select>
+          <span style="color:var(--ink-faint);font-size:13px;" id="historyCount"></span>
+        </div>
+        <div id="historyList"></div>
+      </div>
+    </section>
+
+    <!-- TODOS -->
+    <section class="view" id="view-todos">
+      <div class="page-head"><h1>待辦事項</h1><p>今日待辦與長期待辦清單</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>今日待辦</h2>
+          <ul class="todo-list" id="dailyTodoList2"></ul>
+          <div class="add-row">
+            <input type="text" id="dailyTodoInput2" placeholder="新增今日待辦事項">
+            <button class="btn" id="addDailyTodo2">新增</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>長期待辦清單</h2>
+          <ul class="todo-list" id="longtermTodoList"></ul>
+          <div class="add-row">
+            <input type="text" id="longtermTodoInput" placeholder="新增長期待辦事項" style="flex:2;">
+            <input type="date" id="longtermTodoDate">
+            <button class="btn" id="addLongtermTodo">新增</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- EXPENSES -->
+    <section class="view" id="view-expenses">
+      <div class="page-head"><h1>記帳</h1><p>記錄每一筆收入與支出</p></div>
+
+      <div class="summary-cards">
+        <div class="sum-card income"><div class="label">本月收入</div><div class="value" id="sumIncome">$0</div></div>
+        <div class="sum-card expense"><div class="label">本月支出</div><div class="value" id="sumExpense">$0</div></div>
+        <div class="sum-card balance"><div class="label">本月結餘</div><div class="value" id="sumBalance">$0</div></div>
+      </div>
+
+      <div class="card">
+        <h2>新增紀錄</h2>
+        <div class="type-toggle" id="typeToggle">
+          <button data-type="expense" class="active">支出</button>
+          <button data-type="income">收入</button>
+        </div>
+        <div class="exp-form">
+          <div><label>日期</label><input type="date" id="expDate"></div>
+          <div><label>類別</label><select id="expCategory"></select></div>
+          <div><label>金額</label><input type="number" id="expAmount" min="0" step="1" placeholder="0"></div>
+          <div><label>備註</label><input type="text" id="expNote" placeholder="選填"></div>
+          <button class="btn" id="addExpense">新增</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="filter-row">
+          <select id="expenseMonthFilter"></select>
+        </div>
+        <table class="exp-table">
+          <thead><tr><th>日期</th><th>類別</th><th>備註</th><th style="text-align:right;">金額</th><th></th></tr></thead>
+          <tbody id="expenseTableBody"></tbody>
+        </table>
+        <div class="empty" id="expenseEmpty" style="display:none;">這個月還沒有任何收支紀錄</div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD -->
+    <section class="view" id="view-dashboard">
+      <div class="page-head"><h1>儀表板</h1><p id="dashMonthLabel">本月概況</p></div>
+
+      <div class="card">
+        <h2>情緒與花費脈動</h2>
+        <div class="pulse-wrap"><div class="pulse-strip" id="pulseStrip"></div></div>
+        <div class="pulse-legend" id="pulseLegend"></div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h2>月度收支趨勢(近 6 個月)</h2>
+          <div class="chart-box"><canvas id="trendChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>本月支出分類</h2>
+          <div class="chart-box"><canvas id="categoryChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>預算比對
+          <button class="link-btn" id="toggleBudgetSettings" style="margin-left:auto;">編輯預算</button>
+        </h2>
+        <div class="chart-box"><canvas id="budgetChart"></canvas></div>
+        <div class="budget-settings hidden" id="budgetSettings">
+          <div class="bs-row"><label>每月總預算</label><input type="number" id="budgetTotal" min="0"></div>
+          <div id="budgetCategoryRows"></div>
+          <button class="btn" id="saveBudget" style="margin-top:10px;">儲存預算設定</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+/* ---------- Constants ---------- */
+const EXPENSE_CATEGORIES = ['餐飲','交通','購物','娛樂','居家','醫療','教育','其他'];
+const INCOME_CATEGORIES = ['薪資','獎學金','兼職','其他'];
+const MOODS = [
+  {v:1, emoji:'😢', label:'很差', color:'#5B6B8C', bg:'#EAEDF3'},
+  {v:2, emoji:'😕', label:'不佳', color:'#7C93A8', bg:'#EDF1F4'},
+  {v:3, emoji:'😐', label:'普通', color:'#A8916A', bg:'#F5EFE4'},
+  {v:4, emoji:'🙂', label:'不錯', color:'#4F9E7A', bg:'#E7F5EE'},
+  {v:5, emoji:'😄', label:'很棒', color:'#D98B3F', bg:'#FBF0E2'},
+];
+const WEEKDAYS = ['日','一','二','三','四','五','六'];
+
+/* ---------- State ---------- */
+let state = {
+  journal: {},        // { 'YYYY-MM-DD': {mood, content, updatedAt} }
+  todosDaily: {},      // { 'YYYY-MM-DD': [{id,text,done}] }
+  todosLongterm: [],   // [{id,text,done,dueDate,createdAt}]
+  expenses: [],        // [{id,date,type,category,amount,note}]
+  budget: {monthly:0, categories:{}}
+};
+let currentExpenseType = 'expense';
+let journalSaveTimer = null;
+let trendChartInst=null, categoryChartInst=null, budgetChartInst=null;
+
+/* ---------- Storage helpers ---------- */
+async function safeGet(key, fallback){
+  try{
+    const r = await window.storage.get(key, false);
+    return r ? JSON.parse(r.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function saveKey(key, value){
+  try{ await window.storage.set(key, JSON.stringify(value), false); }
+  catch(e){ console.error('儲存失敗', key, e); }
+}
+
+/* ---------- Date helpers ---------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function todayKey(){ return fmtDate(new Date()); }
+function monthKeyOf(dateStr){ return dateStr.slice(0,7); }
+function thisMonthKey(){ return todayKey().slice(0,7); }
+function fmtLongDate(dateStr){
+  const d = new Date(dateStr+'T00:00:00');
+  return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 星期${WEEKDAYS[d.getDay()]}`;
+}
+function fmtMoney(n){ return '$' + Math.round(n).toLocaleString('zh-TW'); }
+function monthLabel(mk){ const [y,m]=mk.split('-'); return `${y}年${parseInt(m)}月`; }
+
+/* ---------- Init ---------- */
+async function init(){
+  state.journal = await safeGet('journal-entries', {});
+  state.todosDaily = await safeGet('todos-daily', {});
+  state.todosLongterm = await safeGet('todos-longterm', []);
+  state.expenses = await safeGet('expenses', []);
+  state.budget = await safeGet('budget', {monthly:0, categories:{}});
+
+  document.getElementById('sidebarDate').textContent = fmtLongDate(todayKey());
+  document.getElementById('todayTitle').textContent = fmtLongDate(todayKey());
+
+  buildMoodRow();
+  renderToday();
+  renderTodosView();
+  setupExpenseForm();
+  renderExpensesView();
+  renderHistoryView();
+  renderDashboard();
+  setupNav();
+  setupEventListeners();
+}
+
+/* ---------- Nav ---------- */
+function setupNav(){
+  document.querySelectorAll('.nav-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-'+btn.dataset.view).classList.add('active');
+      if(btn.dataset.view==='dashboard') renderDashboard();
+      if(btn.dataset.view==='history') renderHistoryView();
+    });
+  });
+}
+
+/* ---------- TODAY: mood + journal ---------- */
+function buildMoodRow(){
+  const row = document.getElementById('moodRow');
+  row.innerHTML='';
+  MOODS.forEach(m=>{
+    const btn = document.createElement('button');
+    btn.className='mood-btn';
+    btn.style.setProperty('--sel-color', m.color);
+    btn.style.setProperty('--sel-bg', m.bg);
+    btn.innerHTML = `${m.emoji}<span class="label">${m.label}</span>`;
+    btn.addEventListener('click', ()=> setMood(m.v));
+    btn.dataset.mood = m.v;
+    row.appendChild(btn);
+  });
+}
+function setMood(v){
+  const key = todayKey();
+  if(!state.journal[key]) state.journal[key] = {mood:null, content:'', updatedAt:Date.now()};
+  state.journal[key].mood = v;
+  state.journal[key].updatedAt = Date.now();
+  saveKey('journal-entries', state.journal);
+  highlightMood();
+}
+function highlightMood(){
+  const entry = state.journal[todayKey()];
+  document.querySelectorAll('#moodRow .mood-btn').forEach(btn=>{
+    btn.classList.toggle('selected', entry && entry.mood===Number(btn.dataset.mood));
+  });
+}
+function renderToday(){
+  const key = todayKey();
+  const entry = state.journal[key];
+  document.getElementById('journalInput').value = entry ? (entry.content||'') : '';
+  highlightMood();
+  renderDailyTodos('dailyTodoList');
+  renderDailyTodos('dailyTodoList2');
+}
+
+/* Journal auto-save */
+function bindJournalInput(){
+  const input = document.getElementById('journalInput');
+  input.addEventListener('input', ()=>{
+    const hint = document.getElementById('saveHint');
+    hint.textContent = '儲存中…';
+    clearTimeout(journalSaveTimer);
+    journalSaveTimer = setTimeout(async ()=>{
+      const key = todayKey();
+      if(!state.journal[key]) state.journal[key] = {mood:null, content:'', updatedAt:Date.now()};
+      state.journal[key].content = input.value;
+      state.journal[key].updatedAt = Date.now();
+      await saveKey('journal-entries', state.journal);
+      hint.textContent = '已自動儲存';
+    }, 600);
+  });
+}
+
+/* ---------- Daily todos ---------- */
+function renderDailyTodos(targetId){
+  const key = todayKey();
+  const list = state.todosDaily[key] || [];
+  const el = document.getElementById(targetId);
+  el.innerHTML='';
+  if(list.length===0){
+    el.innerHTML = '<div class="empty">今天還沒有待辦事項</div>';
+    return;
+  }
+  list.forEach(item=>{
+    const li = document.createElement('li');
+    li.className = 'todo-item' + (item.done ? ' done':'');
+    li.innerHTML = `<input type="checkbox" ${item.done?'checked':''}> <span class="txt">${escapeHtml(item.text)}</span> <button class="del">✕</button>`;
+    li.querySelector('input').addEventListener('change', ()=> toggleDailyTodo(item.id));
+    li.querySelector('.del').addEventListener('click', ()=> deleteDailyTodo(item.id));
+    el.appendChild(li);
+  });
+}
+async function addDailyTodo(inputId){
+  const input = document.getElementById(inputId);
+  const text = input.value.trim();
+  if(!text) return;
+  const key = todayKey();
+  if(!state.todosDaily[key]) state.todosDaily[key]=[];
+  state.todosDaily[key].push({id: cryptoId(), text, done:false});
+  await saveKey('todos-daily', state.todosDaily);
+  input.value='';
+  renderDailyTodos('dailyTodoList');
+  renderDailyTodos('dailyTodoList2');
+}
+async function toggleDailyTodo(id){
+  const key = todayKey();
+  const item = (state.todosDaily[key]||[]).find(t=>t.id===id);
+  if(item){ item.done = !item.done; await saveKey('todos-daily', state.todosDaily); renderDailyTodos('dailyTodoList'); renderDailyTodos('dailyTodoList2'); }
+}
+async function deleteDailyTodo(id){
+  const key = todayKey();
+  state.todosDaily[key] = (state.todosDaily[key]||[]).filter(t=>t.id!==id);
+  await saveKey('todos-daily', state.todosDaily);
+  renderDailyTodos('dailyTodoList');
+  renderDailyTodos('dailyTodoList2');
+}
+
+/* ---------- Long-term todos ---------- */
+function renderTodosView(){
+  renderDailyTodos('dailyTodoList2');
+  renderLongtermTodos();
+}
+function renderLongtermTodos(){
+  const el = document.getElementById('longtermTodoList');
+  el.innerHTML='';
+  if(state.todosLongterm.length===0){
+    el.innerHTML = '<div class="empty">還沒有長期待辦事項,新增一個吧</div>';
+    return;
+  }
+  const sorted = [...state.todosLongterm].sort((a,b)=>{
+    if(a.done!==b.done) return a.done ? 1 : -1;
+    if(a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+    if(a.dueDate) return -1;
+    if(b.dueDate) return 1;
+    return b.createdAt - a.createdAt;
+  });
+  sorted.forEach(item=>{
+    const li = document.createElement('li');
+    li.className = 'todo-item' + (item.done?' done':'');
+    li.innerHTML = `<input type="checkbox" ${item.done?'checked':''}> <span class="txt">${escapeHtml(item.text)}</span> ${item.dueDate?`<span class="due">${item.dueDate}</span>`:''} <button class="del">✕</button>`;
+    li.querySelector('input').addEventListener('change', ()=> toggleLongtermTodo(item.id));
+    li.querySelector('.del').addEventListener('click', ()=> deleteLongtermTodo(item.id));
+    el.appendChild(li);
+  });
+}
+async function addLongtermTodo(){
+  const textInput = document.getElementById('longtermTodoInput');
+  const dateInput = document.getElementById('longtermTodoDate');
+  const text = textInput.value.trim();
+  if(!text) return;
+  state.todosLongterm.push({id:cryptoId(), text, done:false, dueDate: dateInput.value||null, createdAt: Date.now()});
+  await saveKey('todos-longterm', state.todosLongterm);
+  textInput.value=''; dateInput.value='';
+  renderLongtermTodos();
+}
+async function toggleLongtermTodo(id){
+  const item = state.todosLongterm.find(t=>t.id===id);
+  if(item){ item.done=!item.done; await saveKey('todos-longterm', state.todosLongterm); renderLongtermTodos(); }
+}
+async function deleteLongtermTodo(id){
+  state.todosLongterm = state.todosLongterm.filter(t=>t.id!==id);
+  await saveKey('todos-longterm', state.todosLongterm);
+  renderLongtermTodos();
+}
+
+/* ---------- Expenses ---------- */
+function setupExpenseForm(){
+  document.getElementById('expDate').value = todayKey();
+  populateCategorySelect();
+  document.querySelectorAll('#typeToggle button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('#typeToggle button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      currentExpenseType = btn.dataset.type;
+      populateCategorySelect();
+    });
+  });
+}
+function populateCategorySelect(){
+  const sel = document.getElementById('expCategory');
+  const cats = currentExpenseType==='expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES;
+  sel.innerHTML = cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+async function addExpense(){
+  const date = document.getElementById('expDate').value || todayKey();
+  const category = document.getElementById('expCategory').value;
+  const amount = parseFloat(document.getElementById('expAmount').value);
+  const note = document.getElementById('expNote').value.trim();
+  if(!amount || amount<=0){ alert('請輸入有效金額'); return; }
+  state.expenses.push({id:cryptoId(), date, type:currentExpenseType, category, amount, note});
+  await saveKey('expenses', state.expenses);
+  document.getElementById('expAmount').value='';
+  document.getElementById('expNote').value='';
+  renderExpensesView();
+  renderDashboard();
+}
+function getMonthOptions(){
+  const months = new Set([thisMonthKey()]);
+  state.expenses.forEach(e=>months.add(monthKeyOf(e.date)));
+  return [...months].sort().reverse();
+}
+function renderExpensesView(){
+  const filterSel = document.getElementById('expenseMonthFilter');
+  const prevVal = filterSel.value;
+  const months = getMonthOptions();
+  filterSel.innerHTML = months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
+  filterSel.value = months.includes(prevVal) ? prevVal : thisMonthKey();
+  renderExpenseTable(filterSel.value);
+  updateExpenseSummary(filterSel.value);
+}
+function renderExpenseTable(monthKey){
+  const rows = state.expenses.filter(e=>monthKeyOf(e.date)===monthKey).sort((a,b)=>b.date.localeCompare(a.date));
+  const body = document.getElementById('expenseTableBody');
+  const emptyEl = document.getElementById('expenseEmpty');
+  body.innerHTML='';
+  emptyEl.style.display = rows.length===0 ? 'block' : 'none';
+  rows.forEach(e=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.date}</td><td><span class="cat-chip">${e.category}</span></td><td>${escapeHtml(e.note||'')}</td>
+      <td class="amt ${e.type}">${e.type==='expense'?'-':'+'}${fmtMoney(e.amount)}</td>
+      <td><button class="del-row">✕</button></td>`;
+    tr.querySelector('.del-row').addEventListener('click', ()=> deleteExpense(e.id));
+    body.appendChild(tr);
+  });
+}
+async function deleteExpense(id){
+  state.expenses = state.expenses.filter(e=>e.id!==id);
+  await saveKey('expenses', state.expenses);
+  renderExpensesView();
+  renderDashboard();
+}
+function updateExpenseSummary(monthKey){
+  const rows = state.expenses.filter(e=>monthKeyOf(e.date)===monthKey);
+  const income = rows.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const expense = rows.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('sumIncome').textContent = fmtMoney(income);
+  document.getElementById('sumExpense').textContent = fmtMoney(expense);
+  document.getElementById('sumBalance').textContent = fmtMoney(income-expense);
+}
+
+/* ---------- History ---------- */
+function renderHistoryView(){
+  const months = new Set();
+  Object.keys(state.journal).forEach(d=>months.add(monthKeyOf(d)));
+  const sortedMonths = [...months].sort().reverse();
+  const sel = document.getElementById('historyMonthFilter');
+  const prevVal = sel.value;
+  sel.innerHTML = '<option value="all">全部月份</option>' + sortedMonths.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
+  sel.value = [...sel.options].some(o=>o.value===prevVal) ? prevVal : 'all';
+  renderHistoryList(sel.value);
+}
+function renderHistoryList(filterMonth){
+  const dates = Object.keys(state.journal)
+    .filter(d => filterMonth==='all' || monthKeyOf(d)===filterMonth)
+    .sort().reverse();
+  const listEl = document.getElementById('historyList');
+  document.getElementById('historyCount').textContent = `共 ${dates.length} 篇日記`;
+  listEl.innerHTML='';
+  if(dates.length===0){
+    listEl.innerHTML = '<div class="empty">這段期間還沒有日記,回到「今日」寫下第一篇吧</div>';
+    return;
+  }
+  dates.forEach(d=>{
+    const entry = state.journal[d];
+    const mood = MOODS.find(m=>m.v===entry.mood);
+    const dayExpenses = state.expenses.filter(e=>e.date===d);
+    const spend = dayExpenses.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const income = dayExpenses.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+
+    const item = document.createElement('div');
+    item.className='hist-item';
+    item.innerHTML = `
+      <div class="hist-head">
+        <span class="hist-mood">${mood?mood.emoji:'—'}</span>
+        <span class="hist-date">${d}</span>
+        <span class="hist-snippet">${escapeHtml((entry.content||'').slice(0,60)) || '（無內容）'}</span>
+        <span class="hist-tags">
+          ${spend>0?`<span class="tag spend">-${fmtMoney(spend)}</span>`:''}
+          ${income>0?`<span class="tag income">+${fmtMoney(income)}</span>`:''}
+        </span>
+      </div>
+      <div class="hist-body">
+        <textarea>${escapeHtml(entry.content||'')}</textarea>
+        <div class="hist-actions">
+          <button class="btn ghost save-hist">儲存修改</button>
+          <button class="btn danger del-hist">刪除這篇日記</button>
+        </div>
+      </div>`;
+    item.querySelector('.hist-head').addEventListener('click', ()=>{
+      item.querySelector('.hist-body').classList.toggle('open');
+    });
+    item.querySelector('.save-hist').addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      const val = item.querySelector('textarea').value;
+      state.journal[d].content = val;
+      state.journal[d].updatedAt = Date.now();
+      await saveKey('journal-entries', state.journal);
+      renderHistoryView();
+      if(d===todayKey()) renderToday();
+    });
+    item.querySelector('.del-hist').addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      if(!confirm(`確定要刪除 ${d} 的日記嗎?`)) return;
+      delete state.journal[d];
+      await saveKey('journal-entries', state.journal);
+      renderHistoryView();
+      if(d===todayKey()) renderToday();
+    });
+    listEl.appendChild(item);
+  });
+}
+
+/* ---------- Dashboard ---------- */
+function renderDashboard(){
+  const mk = thisMonthKey();
+  document.getElementById('dashMonthLabel').textContent = `${monthLabel(mk)} 概況`;
+  renderPulseStrip(mk);
+  renderTrendChart();
+  renderCategoryChart(mk);
+  renderBudgetChart(mk);
+  renderBudgetSettingsForm();
+}
+function daysInMonth(mk){
+  const [y,m] = mk.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+function renderPulseStrip(mk){
+  const nDays = daysInMonth(mk);
+  const dayData = [];
+  let maxSpend = 0;
+  for(let d=1; d<=nDays; d++){
+    const dateStr = `${mk}-${pad(d)}`;
+    const entry = state.journal[dateStr];
+    const spend = state.expenses.filter(e=>e.date===dateStr && e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    if(spend>maxSpend) maxSpend = spend;
+    dayData.push({d, mood: entry?entry.mood:null, spend});
+  }
+  const strip = document.getElementById('pulseStrip');
+  strip.innerHTML='';
+  dayData.forEach(dd=>{
+    const mood = MOODS.find(m=>m.v===dd.mood);
+    const heightPct = maxSpend>0 ? Math.max(6, (dd.spend/maxSpend)*100) : 4;
+    const div = document.createElement('div');
+    div.className='pulse-day';
+    div.title = `${dd.d}日${mood?' · '+mood.label:''}${dd.spend>0?' · 支出 '+fmtMoney(dd.spend):''}`;
+    div.innerHTML = `<div class="pulse-bar" style="height:${heightPct}%;background:${mood?mood.color:'#E3E7EC'};"></div><div class="dnum">${dd.d}</div>`;
+    strip.appendChild(div);
+  });
+  const legend = document.getElementById('pulseLegend');
+  legend.innerHTML = MOODS.map(m=>`<span class="lg-item"><span class="lg-dot" style="background:${m.color};"></span>${m.emoji} ${m.label}</span>`).join('') +
+    `<span class="lg-item"><span class="lg-dot" style="background:#E3E7EC;"></span>無紀錄</span>` +
+    `<span class="lg-item" style="margin-left:auto;color:var(--ink-faint);">長條高度 = 當日支出金額</span>`;
+}
+function lastNMonths(n){
+  const arr=[];
+  const now = new Date();
+  for(let i=n-1;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    arr.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
+  }
+  return arr;
+}
+function renderTrendChart(){
+  const months = lastNMonths(6);
+  const incomeData = months.map(mk=> state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='income').reduce((s,e)=>s+e.amount,0));
+  const expenseData = months.map(mk=> state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='expense').reduce((s,e)=>s+e.amount,0));
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  if(trendChartInst) trendChartInst.destroy();
+  trendChartInst = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: months.map(m=>monthLabel(m).replace('年','/').replace('月','')),
+      datasets:[
+        {label:'收入', data:incomeData, borderColor:'#2E7D5B', backgroundColor:'rgba(46,125,91,0.08)', tension:.3, fill:true},
+        {label:'支出', data:expenseData, borderColor:'#C1493D', backgroundColor:'rgba(193,73,61,0.08)', tension:.3, fill:true}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{font:{family:'Noto Sans TC'}, boxWidth:12}}},
+      scales:{ y:{ticks:{callback:v=>'$'+v.toLocaleString()}}, x:{} }
+    }
+  });
+}
+function renderCategoryChart(mk){
+  const rows = state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='expense');
+  const totals = {};
+  EXPENSE_CATEGORIES.forEach(c=>totals[c]=0);
+  rows.forEach(e=> totals[e.category] = (totals[e.category]||0)+e.amount);
+  const labels = Object.keys(totals).filter(c=>totals[c]>0);
+  const data = labels.map(c=>totals[c]);
+  const palette = ['#146B63','#C98A2C','#5B6B8C','#C1493D','#4F9E7A','#8B6BAE','#3E7CB1','#95A0AC'];
+  const ctx = document.getElementById('categoryChart').getContext('2d');
+  if(categoryChartInst) categoryChartInst.destroy();
+  if(labels.length===0){
+    categoryChartInst = null;
+    ctx.clearRect(0,0,9999,9999);
+    ctx.canvas.parentElement.querySelectorAll('.chart-empty').forEach(n=>n.remove());
+    const note = document.createElement('div');
+    note.className='empty chart-empty';
+    note.textContent = '本月還沒有支出紀錄';
+    ctx.canvas.parentElement.appendChild(note);
+    return;
+  }
+  ctx.canvas.parentElement.querySelectorAll('.chart-empty').forEach(n=>n.remove());
+  categoryChartInst = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{data, backgroundColor: labels.map((_,i)=>palette[i%palette.length])}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{family:'Noto Sans TC'}, boxWidth:12}}} }
+  });
+}
+function renderBudgetChart(mk){
+  const cats = EXPENSE_CATEGORIES;
+  const actual = cats.map(c => state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='expense' && e.category===c).reduce((s,e)=>s+e.amount,0));
+  const budgetVals = cats.map(c => (state.budget.categories && state.budget.categories[c]) || 0);
+  const ctx = document.getElementById('budgetChart').getContext('2d');
+  if(budgetChartInst) budgetChartInst.destroy();
+  budgetChartInst = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: cats,
+      datasets:[
+        {label:'預算', data:budgetVals, backgroundColor:'#E3F0EE', borderColor:'#146B63', borderWidth:1.5},
+        {label:'實際支出', data:actual, backgroundColor:'#146B63'}
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{font:{family:'Noto Sans TC'}, boxWidth:12}}},
+      scales:{ y:{ticks:{callback:v=>'$'+v.toLocaleString()}} }
+    }
+  });
+}
+function renderBudgetSettingsForm(){
+  document.getElementById('budgetTotal').value = state.budget.monthly || 0;
+  const wrap = document.getElementById('budgetCategoryRows');
+  wrap.innerHTML = EXPENSE_CATEGORIES.map(c=>`
+    <div class="bs-row">
+      <label>${c}</label>
+      <input type="number" min="0" data-cat="${c}" value="${(state.budget.categories&&state.budget.categories[c])||0}">
+    </div>`).join('');
+}
+async function saveBudget(){
+  const monthly = parseFloat(document.getElementById('budgetTotal').value) || 0;
+  const categories = {};
+  document.querySelectorAll('#budgetCategoryRows input').forEach(inp=>{
+    categories[inp.dataset.cat] = parseFloat(inp.value) || 0;
+  });
+  state.budget = {monthly, categories};
+  await saveKey('budget', state.budget);
+  renderBudgetChart(thisMonthKey());
+  document.getElementById('budgetSettings').classList.add('hidden');
+}
+
+/* ---------- Utils ---------- */
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function cryptoId(){
+  return (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+}
+
+/* ---------- Event listeners ---------- */
+function setupEventListeners(){
+  bindJournalInput();
+  document.getElementById('addDailyTodo').addEventListener('click', ()=>addDailyTodo('dailyTodoInput'));
+  document.getElementById('dailyTodoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addDailyTodo('dailyTodoInput'); });
+  document.getElementById('addDailyTodo2').addEventListener('click', ()=>addDailyTodo('dailyTodoInput2'));
+  document.getElementById('dailyTodoInput2').addEventListener('keydown', e=>{ if(e.key==='Enter') addDailyTodo('dailyTodoInput2'); });
+  document.getElementById('addLongtermTodo').addEventListener('click', addLongtermTodo);
+  document.getElementById('longtermTodoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addLongtermTodo(); });
+  document.getElementById('addExpense').addEventListener('click', addExpense);
+  document.getElementById('expenseMonthFilter').addEventListener('change', (e)=>{
+    renderExpenseTable(e.target.value);
+    updateExpenseSummary(e.target.value);
+  });
+  document.getElementById('historyMonthFilter').addEventListener('change', (e)=> renderHistoryList(e.target.value));
+  document.getElementById('toggleBudgetSettings').addEventListener('click', ()=>{
+    document.getElementById('budgetSettings').classList.toggle('hidden');
+  });
+  document.getElementById('saveBudget').addEventListener('click', saveBudget);
+}
+
+init();
+</script>
+</body>
+</html>
