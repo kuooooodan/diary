@@ -199,7 +199,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
       儀表板
     </button>
-    <div class="sidebar-footer">資料僅儲存於你個人的帳號中,不會與他人共用。</div>
+    <div class="sidebar-footer">資料儲存在此瀏覽器的本機空間,僅限這台裝置、這個瀏覽器使用,不會與他人共用。</div>
   </aside>
 
   <main class="main">
@@ -362,16 +362,17 @@ let currentExpenseType = 'expense';
 let journalSaveTimer = null;
 let trendChartInst=null, categoryChartInst=null, budgetChartInst=null;
 
-/* ---------- Storage helpers ---------- */
-async function safeGet(key, fallback){
+/* ---------- Storage helpers (browser localStorage, persists on this device/browser) ---------- */
+const STORAGE_PREFIX = 'diaryapp_';
+function safeGet(key, fallback){
   try{
-    const r = await window.storage.get(key, false);
-    return r ? JSON.parse(r.value) : fallback;
-  }catch(e){ return fallback; }
+    const raw = localStorage.getItem(STORAGE_PREFIX+key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){ console.error('讀取失敗', key, e); return fallback; }
 }
 async function saveKey(key, value){
-  try{ await window.storage.set(key, JSON.stringify(value), false); }
-  catch(e){ console.error('儲存失敗', key, e); }
+  try{ localStorage.setItem(STORAGE_PREFIX+key, JSON.stringify(value)); }
+  catch(e){ console.error('儲存失敗', key, e); alert('資料儲存失敗,請確認瀏覽器允許本機儲存空間(localStorage)。'); }
 }
 
 /* ---------- Date helpers ---------- */
