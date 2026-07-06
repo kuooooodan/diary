@@ -290,12 +290,13 @@
       <div class="card">
         <div class="filter-row">
           <select id="expenseMonthFilter"></select>
+          <span style="color:var(--ink-faint);font-size:13px;" id="expenseCount"></span>
         </div>
         <table class="exp-table">
           <thead><tr><th>日期</th><th>類別</th><th>備註</th><th style="text-align:right;">金額</th><th></th></tr></thead>
           <tbody id="expenseTableBody"></tbody>
         </table>
-        <div class="empty" id="expenseEmpty" style="display:none;">這個月還沒有任何收支紀錄</div>
+        <div class="empty" id="expenseEmpty" style="display:none;">還沒有任何收支紀錄</div>
       </div>
     </section>
 
@@ -311,7 +312,7 @@
 
       <div class="grid-2">
         <div class="card">
-          <h2>月度收支趨勢(近 6 個月)</h2>
+          <h2>月度收支趨勢(完整歷史紀錄)</h2>
           <div class="chart-box"><canvas id="trendChart"></canvas></div>
         </div>
         <div class="card">
@@ -610,17 +611,22 @@ function renderExpensesView(){
   const filterSel = document.getElementById('expenseMonthFilter');
   const prevVal = filterSel.value;
   const months = getMonthOptions();
-  filterSel.innerHTML = months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
-  filterSel.value = months.includes(prevVal) ? prevVal : thisMonthKey();
+  filterSel.innerHTML = '<option value="all">全部歷史紀錄</option>' + months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join('');
+  filterSel.value = [...filterSel.options].some(o=>o.value===prevVal) ? prevVal : thisMonthKey();
   renderExpenseTable(filterSel.value);
   updateExpenseSummary(filterSel.value);
 }
 function renderExpenseTable(monthKey){
-  const rows = state.expenses.filter(e=>monthKeyOf(e.date)===monthKey).sort((a,b)=>b.date.localeCompare(a.date));
+  const showAll = monthKey==='all';
+  const rows = state.expenses
+    .filter(e=> showAll || monthKeyOf(e.date)===monthKey)
+    .sort((a,b)=>b.date.localeCompare(a.date));
   const body = document.getElementById('expenseTableBody');
   const emptyEl = document.getElementById('expenseEmpty');
   body.innerHTML='';
   emptyEl.style.display = rows.length===0 ? 'block' : 'none';
+  emptyEl.textContent = showAll ? '還沒有任何收支紀錄,到上面新增第一筆吧' : '這個月還沒有任何收支紀錄';
+  document.getElementById('expenseCount').textContent = rows.length>0 ? `共 ${rows.length} 筆紀錄` : '';
   rows.forEach(e=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${e.date}</td><td><span class="cat-chip">${e.category}</span></td><td>${escapeHtml(e.note||'')}</td>
@@ -637,9 +643,14 @@ async function deleteExpense(id){
   renderDashboard();
 }
 function updateExpenseSummary(monthKey){
-  const rows = state.expenses.filter(e=>monthKeyOf(e.date)===monthKey);
+  const showAll = monthKey==='all';
+  const rows = state.expenses.filter(e=> showAll || monthKeyOf(e.date)===monthKey);
   const income = rows.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
   const expense = rows.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const labels = document.querySelectorAll('.sum-card .label');
+  labels[0].textContent = showAll ? '總收入' : '本月收入';
+  labels[1].textContent = showAll ? '總支出' : '本月支出';
+  labels[2].textContent = showAll ? '總結餘' : '本月結餘';
   document.getElementById('sumIncome').textContent = fmtMoney(income);
   document.getElementById('sumExpense').textContent = fmtMoney(expense);
   document.getElementById('sumBalance').textContent = fmtMoney(income-expense);
@@ -767,8 +778,13 @@ function lastNMonths(n){
   }
   return arr;
 }
+function getTrendMonths(){
+  const months = new Set(lastNMonths(6));
+  state.expenses.forEach(e=>months.add(monthKeyOf(e.date)));
+  return [...months].sort();
+}
 function renderTrendChart(){
-  const months = lastNMonths(6);
+  const months = getTrendMonths();
   const incomeData = months.map(mk=> state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='income').reduce((s,e)=>s+e.amount,0));
   const expenseData = months.map(mk=> state.expenses.filter(e=>monthKeyOf(e.date)===mk && e.type==='expense').reduce((s,e)=>s+e.amount,0));
   const ctx = document.getElementById('trendChart').getContext('2d');
